@@ -34,40 +34,6 @@ def parse_formation(file_path):
     formation_entries = [create_dict(row) for _, row in data.iterrows()]
     return formation_entries
 
-# Funcție pentru parsarea fișierului Recap.xlsx
-def parse_acoperite(file_path):
-    df = pd.read_excel(file_path)
-    df = df.dropna(subset=['Denumirea disciplinei']).reset_index(drop=True)
-    
-    sem1_curs_col = df.columns[11]
-    sem2_curs_col = df.columns[17]
-    sem1_sem_col = df.columns[12]
-    sem2_sem_col = df.columns[18]
-    sem1_lab_col = df.columns[13]
-    sem2_lab_col = df.columns[19]
-
-    def create_teacher_entry(row):
-        total_ore_curs = row[sem1_curs_col] if not pd.isna(row[sem1_curs_col]) else (
-            row[sem2_curs_col] if not pd.isna(row[sem2_curs_col]) else 0)
-        if not pd.isna(row[sem1_sem_col]):
-            total_ore_sem = row[sem1_sem_col]
-        elif not pd.isna(row[sem2_sem_col]):
-            total_ore_sem = row[sem2_sem_col]
-        elif not pd.isna(row[sem1_lab_col]):
-            total_ore_sem = row[sem1_lab_col]
-        elif not pd.isna(row[sem2_lab_col]):
-            total_ore_sem = row[sem2_lab_col]
-        else:
-            total_ore_sem = 0
-        return {
-            'name': row['Denumirea disciplinei'],
-            'seminar': True if row['Unnamed: 25'] == 1 else False,
-            'totalOreCurs': total_ore_curs,
-            'totalOreSeminar': total_ore_sem,
-        }
-
-    return df.apply(create_teacher_entry, axis=1).tolist()
-
 # Funcție pentru parsarea fișierului State_2021.xlsx
 def parse_state(file_path):
     excel_data = pd.read_excel(file_path, sheet_name=None)  # Citim toate foile
@@ -89,10 +55,28 @@ def parse_state(file_path):
                     'name': row['Numele şi prenumele'],
                     'position': row['Denumirea postului'],
                     'discipline': row['Disciplina'] if 'Disciplina' in row else None,
+                    'specialization': row['Specializarea'] if 'Specializarea' in row else None,
                     'tip': tip
                 }
                 state_entries.append(teacher_entry)
     return state_entries
+
+# Funcție pentru parsarea fișierelor AcoperireSem1 și AcoperireSem2
+def parse_acoperire(file_path):
+    df = pd.read_excel(file_path)
+    df = df.dropna(subset=['Disciplina']).reset_index(drop=True)
+    
+    acoperire_entries = []
+
+    for _, row in df.iterrows():
+        acoperire_entry = {
+            'discipline': row['Disciplina'],
+            'professor': row['Cadru didactic'],
+            'specialization': row['Specializarea'] if 'Specializarea' in row else None
+        }
+        acoperire_entries.append(acoperire_entry)
+    
+    return acoperire_entries
 
 # Funcție pentru parsarea fișierului Sali.xlsx
 def parse_sali(file_path):
@@ -189,7 +173,7 @@ def insert_into_event():
         for _, row in df.iterrows():
             curs_id = cursuri.get(row['Disciplina'])
             profesor_id = profesori.get(row['Cadru didactic'])
-            tip = 'laborator' if row['Sem'] == 0 else 'curs'
+            tip = 'laborator' if row['Seminar'] == 0 else 'curs'
 
             if curs_id and profesor_id:
                 cur.execute('''
@@ -212,18 +196,87 @@ def insert_into_event():
 
     conn.commit()
 
+# Funcție pentru inserarea datelor în tabelul eventParticipant
+def insert_into_event_participant():
+    # Construim mapări pentru cursuri și profesori
+    cur.execute('SELECT cursID, nume FROM Curs')
+    cursuri = {row[1]: row[0] for row in cur.fetchall()}
+
+    cur.execute('SELECT profesorID, nume FROM Profesor')
+    profesori = {row[1]: row[0] for row in cur.fetchall()}
+
+    # Construim mapări pentru eventID pe baza cursID și profesorID
+    cur.execute('SELECT eventID, cursID, profesorID FROM Event')
+    events = cur.fetchall()
+    event_map = {(row[1], row[2]): row[0] for row in events}
+
+    # Construim mapări pentru specializări
+    cur.execute('SELECT specNumber, nume FROM Specializare')
+    specializari = {row[1]: row[0] for row in cur.fetchall()}
+
+    # Construim mapări pentru grupe și subgrupe
+    cur.execute('SELECT grupaNumber, specNumber FROM Grupa')
+    grupe = cur.fetchall()
+
+    cur.execute('SELECT subgrupaNumber, grupaNumber FROM Subgrupa')
+    subgrupe = cur.fetchall()
+
+    def get_grupe_and_subgrupe(spec_id):
+        grupe_ids = [grupa[0] for grupa in grupe if grupa[1] == spec_id]
+        subgrupe_ids = [subgrupa[0] for subgrupa in subgrupe if subgrupa[1] in grupe_ids]
+        return subgrupe_ids
+
+    # Parsăm fișierele AcoperireSem1 și AcoperireSem2
+    for file_path in [file_paths[0], file_paths[1]]:
+        df = pd.read_excel(file_path)
+        df = df.dropna(subset=['Disciplina']).reset_index(drop=True)
+        
+        for _, row in df.iterrows():
+            curs_id = cursuri.get(row['Disciplina'])
+            profesor_id = profesori.get(row['Cadru didactic'])
+            spec_id = specializari.get(row['Specializarea'])
+
+            if curs_id and profesor_id and spec_id:
+                event_id = event_map.get((curs_id, profesor_id))
+                subgrupe_ids = get_grupe_and_subgrupe(spec_id)
+                for subgrupa_id in subgrupe_ids:
+                    cur.execute('''
+                        INSERT INTO eventParticipant (eventID, subgrupaNumar)
+                        VALUES (?, ?)
+                    ''', (event_id, subgrupa_id))
+
+    # Parsăm fișierul State_2021.xlsx
+    state_entries = parse_state(file_paths[4])
+
+    for entry in state_entries:
+        curs_id = cursuri.get(entry['discipline'])
+        profesor_id = profesori.get(entry['name'])
+        spec_id = specializari.get(entry['specialization'])
+
+        if curs_id and profesor_id and spec_id:
+            event_id = event_map.get((curs_id, profesor_id))
+            subgrupe_ids = get_grupe_and_subgrupe(spec_id)
+            for subgrupa_id in subgrupe_ids:
+                cur.execute('''
+                    INSERT INTO eventParticipant (eventID, subgrupaNumar)
+                    VALUES (?, ?)
+                ''', (event_id, subgrupa_id))
+
+    conn.commit()
+
 # Parsăm și inserăm datele în baza de date
 formation_entries = parse_formation(file_paths[2])
-acoperite_entries = parse_acoperite(file_paths[3])
 state_entries = parse_state(file_paths[4])
+acoperire_entries = parse_acoperire(file_paths[0]) + parse_acoperire(file_paths[1])
 sali_entries = parse_sali(file_paths[5])
 
-#insert_into_specializare(formation_entries)
-#insert_into_grupa(formation_entries)
-#insert_into_sala(sali_entries)
-#insert_into_profesor(state_entries)
-#insert_into_subgrupa(formation_entries)
+insert_into_specializare(formation_entries)
+insert_into_grupa(formation_entries)
+insert_into_sala(sali_entries)
+insert_into_profesor(state_entries)
+insert_into_subgrupa(formation_entries)
 insert_into_event()
+insert_into_event_participant()
 
 # Închidem conexiunea la baza de date
 conn.close()
