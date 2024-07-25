@@ -6,6 +6,22 @@ conn = sqlite3.connect('orar.db')
 cur = conn.cursor()
 
 # Definim calea fișierelor Excel
+file_paths = []
+outputMode = ""
+with inputFile as open('config.json',rt):
+   data = json.load(inputFile)
+   file_path.append(data['acoperiresem1'])
+   file_path.append(data['acoperiresem2'])
+
+   outputMode = data['output']
+#{
+#  'acoperiresem1':'C:\\Users\\tedy\\Desktop\\AcoperireSem1.xlsx',
+#  'acoperiresem2': 'C:\\fsafsafsafsffafsa'
+#  'formatii' : 'c:\\Users....',
+#   'output' : 'DB' //possible values 'TXT'
+#}
+
+print(file_paths)
 file_paths = [
     'C:\\Users\\tedy\\Desktop\\AcoperireSem1.xlsx',
     'C:\\Users\\tedy\\Desktop\\AcoperireSem2.xlsx',
@@ -303,6 +319,11 @@ acoperire_entries = parse_acoperire(file_paths[0]) + parse_acoperire(file_paths[
 sali_entries = parse_sali(file_paths[5])
 acoperite_entries = parse_acoperite(file_paths[3])
 
+# output = ''
+# if (outputMode == 'DB'):
+#    output = DBOutput()
+#outtput.insert_into_curs(acoperite_entries)
+#.........
 
 insert_into_curs(acoperite_entries)
 insert_into_specializare(formation_entries)
