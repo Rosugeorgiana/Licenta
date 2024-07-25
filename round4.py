@@ -70,21 +70,28 @@ def parse_acoperite(file_path):
 
 # Funcție pentru parsarea fișierului State_2021.xlsx
 def parse_state(file_path):
-    excel_data = pd.read_excel(file_path)
-    excel_data_clean = excel_data.dropna(subset=['Denumirea postului', 'Numele şi prenumele'])  # Eliminăm rândurile fără denumirea postului și nume
-
+    excel_data = pd.read_excel(file_path, sheet_name=None)  # Citim toate foile
     state_entries = []
 
-    for _, row in excel_data_clean.iterrows():
-        if row['Numele şi prenumele'].strip().lower() != 'vacant':
-            teacher_entry = {
-                'name': row['Numele şi prenumele'],
-                'position': row['Denumirea postului'],
-                'firstname': row['Numele şi prenumele'].split()[0] if len(row['Numele şi prenumele'].split()) > 1 else '',
-                'phone': '0000000000'  # Număr de telefon fictiv
-            }
-            state_entries.append(teacher_entry)
-    
+    if "Anii de studiu Seria / nr. gr." in excel_data:
+        df_state = excel_data["Anii de studiu Seria / nr. gr."]
+        df_state_clean = df_state.dropna(subset=['Denumirea postului', 'Numele şi prenumele'])  # Eliminăm rândurile fără denumirea postului și nume
+        
+        for _, row in df_state_clean.iterrows():
+            if row['Numele şi prenumele'].strip().lower() != 'vacant':
+                tip = 'curs'
+                if 'gr' in row['Anii de studiu Seria / nr. gr.'].lower():
+                    tip = 'seminar'
+                if 'sgr' in row['Anii de studiu Seria / nr. gr.'].lower():
+                    tip = 'laborator'
+                
+                teacher_entry = {
+                    'name': row['Numele şi prenumele'],
+                    'position': row['Denumirea postului'],
+                    'discipline': row['Disciplina'] if 'Disciplina' in row else None,
+                    'tip': tip
+                }
+                state_entries.append(teacher_entry)
     return state_entries
 
 # Funcție pentru parsarea fișierului Sali.xlsx
@@ -182,12 +189,26 @@ def insert_into_event():
         for _, row in df.iterrows():
             curs_id = cursuri.get(row['Disciplina'])
             profesor_id = profesori.get(row['Cadru didactic'])
+            tip = 'laborator' if row['Sem'] == 0 else 'curs'
 
             if curs_id and profesor_id:
                 cur.execute('''
-                    INSERT INTO Event (cursID, profesorID)
-                    VALUES (?, ?)
-                ''', (curs_id, profesor_id))
+                    INSERT INTO Event (cursID, profesorID, tip)
+                    VALUES (?, ?, ?)
+                ''', (curs_id, profesor_id, tip))
+
+    # Parsăm fișierul State_2021.xlsx
+    state_entries = parse_state(file_paths[4])
+
+    for entry in state_entries:
+        curs_id = cursuri.get(entry['discipline'])
+        profesor_id = profesori.get(entry['name'])
+
+        if curs_id and profesor_id:
+            cur.execute('''
+                INSERT INTO Event (cursID, profesorID, tip)
+                VALUES (?, ?, ?)
+            ''', (curs_id, profesor_id, entry['tip']))
 
     conn.commit()
 
