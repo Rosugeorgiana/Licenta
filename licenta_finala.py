@@ -1,19 +1,27 @@
 import pandas as pd
 import sqlite3
+import json
 
 # Conectare la baza de date SQLite
 conn = sqlite3.connect('orar.db')
 cur = conn.cursor()
 
 # Definim calea fișierelor Excel
-file_paths = [
-    'C:\\Users\\tedy\\Desktop\\AcoperireSem1.xlsx',
-    'C:\\Users\\tedy\\Desktop\\AcoperireSem2.xlsx',
-    'C:\\Users\\tedy\\Desktop\\Formatii.xlsx',
-    'C:\\Users\\tedy\\Desktop\\Recap.xlsx',
-    'C:\\Users\\tedy\\Desktop\\State_2021.xlsx',
-    'C:\\Users\\tedy\\Desktop\\Sali.xlsx'
-]
+file_paths = []
+outputMode = ""
+with inputFile as open('config.json',rt):
+   data = json.load(inputFile)
+   file_path.append(data['acoperiresem1'])
+   file_path.append(data['acoperiresem2'])
+   file_path.append(data['formatii'])
+   file_path.append(data['recap'])
+   file_path.append(data['state'])
+   file_path.append(data['sali'])
+
+   outputMode = data['output']
+
+print(file_paths)
+
 
 # Funcție pentru parsarea fișierului Formatii.xlsx
 def parse_formation(file_path):
