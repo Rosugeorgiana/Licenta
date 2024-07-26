@@ -9,18 +9,19 @@ cur = conn.cursor()
 # Definim calea fișierelor Excel
 file_paths = []
 outputMode = ""
-with inputFile as open('config.json',rt):
-   data = json.load(inputFile)
-   file_path.append(data['acoperiresem1'])
-   file_path.append(data['acoperiresem2'])
-   file_path.append(data['formatii'])
-   file_path.append(data['recap'])
-   file_path.append(data['state'])
-   file_path.append(data['sali'])
+with open('config.json', 'r') as inputFile:
+    data = json.load(inputFile)
+    file_paths.append(data['acoperiresem1'])
+    file_paths.append(data['acoperiresem2'])
+    file_paths.append(data['formatii'])
+    file_paths.append(data['recap'])
+    file_paths.append(data['state'])
+    file_paths.append(data['sali'])
 
-   outputMode = data['output']
+    outputMode = data['output']
 
 print(file_paths)
+
 
 
 # Funcție pentru parsarea fișierului Formatii.xlsx

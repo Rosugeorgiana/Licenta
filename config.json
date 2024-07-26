@@ -1,9 +1,10 @@
 {
-  'acoperiresem1':'C:\\Users\\tedy\\Desktop\\AcoperireSem1.xlsx',
-  'acoperiresem2':'C:\\Users\\tedy\\Desktop\\AcoperireSem2.xlsx',
-  'formatii' :'C:\\Users\\tedy\\Desktop\\Formatii.xlsx',
-  'recap':'C:\\Users\\tedy\\Desktop\\Recap.xlsx',
-  'state':'C:\\Users\\tedy\\Desktop\\State_2021.xlsx',
-  'sali':'C:\\Users\\tedy\\Desktop\\Sali.xlsx',
-   'output' : 'DB' //possible values 'TXT'
-}
+    "acoperiresem1": "C:\\Users\\tedy\\Desktop\\AcoperireSem1.xlsx",
+    "acoperiresem2": "C:\\Users\\tedy\\Desktop\\AcoperireSem2.xlsx",
+    "formatii": "C:\\Users\\tedy\\Desktop\\Formatii.xlsx",
+    "recap": "C:\\Users\\tedy\\Desktop\\Recap.xlsx",
+    "state": "C:\\Users\\tedy\\Desktop\\State_2021.xlsx",
+    "sali": "C:\\Users\\tedy\\Desktop\\Sali.xlsx",
+    "output": "DB"
+  }
+  
