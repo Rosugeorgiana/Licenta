@@ -199,14 +199,6 @@ def insert_into_event():
 
     cur.execute('SELECT profesorID, nume FROM Profesor')
     profesori = {row[1]: row[0] for row in cur.fetchall()}
-# Funcție pentru inserarea datelor în tabelul Curs
-def insert_into_curs(entries):
-    for entry in entries:
-        cur.execute('''
-            INSERT INTO Curs (nume, seminar, cursOre, labOre)
-            VALUES (?, ?, ?, ?)
-        ''', (entry['name'], entry['seminar'], entry['totalOreCurs'], entry['totalOreSeminar']))
-    conn.commit()
     # Parsăm fișierele AcoperireSem1 și AcoperireSem2
     for file_path in [file_paths[0], file_paths[1]]:
         df = pd.read_excel(file_path)
@@ -215,7 +207,7 @@ def insert_into_curs(entries):
         for _, row in df.iterrows():
             curs_id = cursuri.get(row['Disciplina'])
             profesor_id = profesori.get(row['Cadru didactic'])
-            tip = 'laborator' if row['Seminar'] == 0 else 'curs'
+            tip = 'laborator' if row['Sem'] == 0 else 'curs'
 
             if curs_id and profesor_id:
                 cur.execute('''
@@ -225,18 +217,26 @@ def insert_into_curs(entries):
     # Parsăm fișierul State_2021.xlsx
     state_entries = parse_state(file_paths[4])
 
-    for entry in state_entries:
-        curs_id = cursuri.get(entry['discipline'])
-        profesor_id = profesori.get(entry['name'])
-
-        if curs_id and profesor_id:
-            cur.execute('''
-                INSERT INTO Event (cursID, profesorID, tip)
-                VALUES (?, ?, ?)
-            ''', (curs_id, profesor_id, entry['tip']))
+#    for entry in state_entries:
+#        curs_id = cursuri.get(entry['discipline'])
+#        profesor_id = profesori.get(entry['Numele și Prenumele'])
+#
+#        if curs_id and profesor_id:
+#            cur.execute('''
+#                INSERT INTO Event (cursID, profesorID, tip)
+#                VALUES (?, ?, ?)
+#            ''', (curs_id, profesor_id, entry['tip']))
 
     conn.commit()
 
+# Funcție pentru inserarea datelor în tabelul Curs
+def insert_into_curs(entries):
+    for entry in entries:
+        cur.execute('''
+            INSERT INTO Curs (nume, seminar, cursOre, labOre)
+            VALUES (?, ?, ?, ?)
+        ''', (entry['name'], entry['seminar'], entry['totalOreCurs'], entry['totalOreSeminar']))
+    conn.commit()
 # Funcție pentru inserarea datelor în tabelul eventParticipant
 def insert_into_event_participant():
     # Construim mapări pentru cursuri și profesori
@@ -289,19 +289,19 @@ def insert_into_event_participant():
     # Parsăm fișierul State_2021.xlsx
     state_entries = parse_state(file_paths[4])
 
-    for entry in state_entries:
-        curs_id = cursuri.get(entry['discipline'])
-        profesor_id = profesori.get(entry['name'])
-        spec_id = specializari.get(entry['specialization'])
-
-        if curs_id and profesor_id and spec_id:
-            event_id = event_map.get((curs_id, profesor_id))
-            subgrupe_ids = get_grupe_and_subgrupe(spec_id)
-            for subgrupa_id in subgrupe_ids:
-                cur.execute('''
-                    INSERT INTO eventParticipant (eventID, subgrupaNumar)
-                    VALUES (?, ?)
-                ''', (event_id, subgrupa_id))
+#    for entry in state_entries:
+#        curs_id = cursuri.get(entry['discipline'])
+#        profesor_id = profesori.get(entry['name'])
+#        spec_id = specializari.get(entry['specialization'])
+#
+#        if curs_id and profesor_id and spec_id:
+#            event_id = event_map.get((curs_id, profesor_id))
+#            subgrupe_ids = get_grupe_and_subgrupe(spec_id)
+#            for subgrupa_id in subgrupe_ids:
+#                cur.execute('''
+#                    INSERT INTO eventParticipant (eventID, subgrupaNumar)
+#                    VALUES (?, ?)
+#                ''', (event_id, subgrupa_id))
 
     conn.commit()
 
