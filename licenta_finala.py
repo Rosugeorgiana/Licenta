@@ -1,11 +1,10 @@
 import pandas as pd
-import sqlite3
 import json
 
 # Conectare la baza de date SQLite
-conn = sqlite3.connect('orar.db')
-cur = conn.cursor()
+from output_db import Output_DB
 
+from output_txt import Output_TXT
 # Definim calea fișierelor Excel
 file_paths = []
 outputMode = ""
@@ -129,91 +128,22 @@ def parse_acoperire(file_path):
         acoperire_entries.append(acoperire_entry)
     
     return acoperire_entries
+def parse_acoperire_pentru_events():
 
-# Funcție pentru inserarea datelor în tabelul Specializare
-def insert_into_specializare(entries):
-    for entry in entries:
-        cur.execute('''
-            INSERT INTO Specializare (nume, an, tip, numarGrupe, numarSubgrupe)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (entry['specialization'], entry['year'], entry['type'], entry['grupe'], entry['subgrupe']))
-    conn.commit()
-
-# Funcție pentru inserarea datelor în tabelul Sala
-def insert_into_sala(entries):
-    for entry in entries:
-        cur.execute('''
-            INSERT INTO Sala (nume, capacitate)
-            VALUES (?, ?)
-        ''', (entry['nume'], entry['capacitate']))
-    conn.commit()
-
-# Funcție pentru inserarea datelor în tabelul Profesor
-def insert_into_profesor(entries):
-    for entry in entries:
-        cur.execute('''
-            INSERT INTO Profesor (nume, pozitie)
-            VALUES (?, ?)
-        ''', (entry['name'], entry['position']))
-    conn.commit()
-
-# Funcție pentru inserarea datelor în tabelul Grupa
-def insert_into_grupa(entries):
-    for entry in entries:
-        cur.execute('SELECT specNumber FROM Specializare WHERE nume = ?', (entry['specialization'],))
-        specializare_id = cur.fetchone()[0]
-        for i in range(entry['grupe']):
-            grupa_name = f'grupa{i + 1}'
-            cur.execute('''
-                INSERT INTO Grupa (specNumber, nume)
-                VALUES (?, ?)
-            ''', (specializare_id, grupa_name))
-    conn.commit()
-
-# Funcție pentru inserarea datelor în tabelul Subgrupa
-def insert_into_subgrupa(entries):
-    for entry in entries:
-        cur.execute('SELECT specNumber FROM Specializare WHERE nume = ?', (entry['specialization'],))
-        specializare_id = cur.fetchone()[0]
-        cur.execute('SELECT grupaNumber FROM Grupa WHERE specNumber = ?', (specializare_id,))
-        grupaNumbers = cur.fetchall()
-        subgrupe_per_grupa = entry['subgrupe'] // entry['grupe']
-        remainder = entry['subgrupe'] % entry['grupe']
-        subgrupa_counter = 1
-        for idx, grupaNumber in enumerate(grupaNumbers):
-            subgrupe_in_this_grupa = subgrupe_per_grupa + (1 if idx < remainder else 0)
-            for _ in range(subgrupe_in_this_grupa):
-                subgrupa_name = f'subgrupa{subgrupa_counter}'
-                cur.execute('''
-                    INSERT INTO Subgrupa (grupaNumber, nume)
-                    VALUES (?, ?)
-                ''', (grupaNumber[0], subgrupa_name))
-                subgrupa_counter += 1
-    conn.commit()
-
-# Funcție pentru inserarea datelor în tabelul Event
-def insert_into_event():
-    # Construim mapări pentru cursuri și profesori
-    cur.execute('SELECT cursID, nume FROM Curs')
-    cursuri = {row[1]: row[0] for row in cur.fetchall()}
-
-    cur.execute('SELECT profesorID, nume FROM Profesor')
-    profesori = {row[1]: row[0] for row in cur.fetchall()}
+    rezultat = []
     # Parsăm fișierele AcoperireSem1 și AcoperireSem2
     for file_path in [file_paths[0], file_paths[1]]:
         df = pd.read_excel(file_path)
         df = df.dropna(subset=['Disciplina']).reset_index(drop=True)
         
         for _, row in df.iterrows():
-            curs_id = cursuri.get(row['Disciplina'])
-            profesor_id = profesori.get(row['Cadru didactic'])
-            tip = 'laborator' if row['Sem'] == 0 else 'curs'
+            rezultat.append(row)
 
-            if curs_id and profesor_id:
-                cur.execute('''
-                    INSERT INTO Event (cursID, profesorID, tip)
-                    VALUES (?, ?, ?)
-                ''', (curs_id, profesor_id, tip))
+    return rezultat
+# Funcție pentru inserarea datelor în tabelul Event
+
+def insert_into_event(acoperire_events):
+    #TO BE DEFINE
     # Parsăm fișierul State_2021.xlsx
     state_entries = parse_state(file_paths[4])
 
@@ -229,16 +159,7 @@ def insert_into_event():
 
     conn.commit()
 
-# Funcție pentru inserarea datelor în tabelul Curs
-def insert_into_curs(entries):
-    for entry in entries:
-        cur.execute('''
-            INSERT INTO Curs (nume, seminar, cursOre, labOre)
-            VALUES (?, ?, ?, ?)
-        ''', (entry['name'], entry['seminar'], entry['totalOreCurs'], entry['totalOreSeminar']))
-    conn.commit()
-# Funcție pentru inserarea datelor în tabelul eventParticipant
-def insert_into_event_participant():
+def insert_into_event_participant(acoperire_events):
     # Construim mapări pentru cursuri și profesori
     cur.execute('SELECT cursID, nume FROM Curs')
     cursuri = {row[1]: row[0] for row in cur.fetchall()}
@@ -267,24 +188,20 @@ def insert_into_event_participant():
         subgrupe_ids = [subgrupa[0] for subgrupa in subgrupe if subgrupa[1] in grupe_ids]
         return subgrupe_ids
 
-    # Parsăm fișierele AcoperireSem1 și AcoperireSem2
-    for file_path in [file_paths[0], file_paths[1]]:
-        df = pd.read_excel(file_path)
-        df = df.dropna(subset=['Disciplina']).reset_index(drop=True)
         
-        for _, row in df.iterrows():
-            curs_id = cursuri.get(row['Disciplina'])
-            profesor_id = profesori.get(row['Cadru didactic'])
-            spec_id = specializari.get(row['Specializarea'])
+    for row in acoperire_events:
+        curs_id = cursuri.get(row['Disciplina'])
+        profesor_id = profesori.get(row['Cadru didactic'])
+        spec_id = specializari.get(row['Specializarea'])
 
-            if curs_id and profesor_id and spec_id:
-                event_id = event_map.get((curs_id, profesor_id))
-                subgrupe_ids = get_grupe_and_subgrupe(spec_id)
-                for subgrupa_id in subgrupe_ids:
-                    cur.execute('''
-                        INSERT INTO eventParticipant (eventID, subgrupaNumar)
-                        VALUES (?, ?)
-                    ''', (event_id, subgrupa_id))
+        if curs_id and profesor_id and spec_id:
+            event_id = event_map.get((curs_id, profesor_id))
+            subgrupe_ids = get_grupe_and_subgrupe(spec_id)
+            for subgrupa_id in subgrupe_ids:
+                cur.execute('''
+                    INSERT INTO eventParticipant (eventID, subgrupaNumar)
+                    VALUES (?, ?)
+                ''', (event_id, subgrupa_id))
 
     # Parsăm fișierul State_2021.xlsx
     state_entries = parse_state(file_paths[4])
@@ -311,16 +228,34 @@ state_entries = parse_state(file_paths[4])
 acoperire_entries = parse_acoperire(file_paths[0]) + parse_acoperire(file_paths[1])
 sali_entries = parse_sali(file_paths[5])
 acoperite_entries = parse_acoperite(file_paths[3])
+acoperire_events = parse_acoperire_pentru_events()
 
+dataOut = ''#Output()
+if outputMode == 'DB':
+    dataOut = Output_DB()
+else:
+    dataOut = Output_TXT()
 
-insert_into_curs(acoperite_entries)
-insert_into_specializare(formation_entries)
-insert_into_grupa(formation_entries)
-insert_into_sala(sali_entries)
-insert_into_profesor(state_entries)
-insert_into_subgrupa(formation_entries)
-insert_into_event()
-insert_into_event_participant()
+#insert_into_curs(acoperite_entries)
+dataOut.output_curs(acoperite_entries)
 
-# Închidem conexiunea la baza de date
-conn.close()
+#insert_into_specializare(formation_entries)
+dataOut.output_specializare(formation_entries)
+
+#insert_into_grupa(formation_entries)
+dataOut.output_grupa(formation_entries)
+
+#insert_into_sala(sali_entries)
+dataOut.output_sala(sali_entries)
+
+#insert_into_profesor(state_entries)
+dataOut.output_profesor(state_entries)
+
+#insert_into_subgrupa(formation_entries)
+dataOut.output_subgrupa(formation_entries)
+
+#insert_into_event(acoperire_events)
+dataOut.output_event(acoperire_events)
+
+#insert_into_event_participant(acoperire_events)
+dataOut.output_event_participant(acoperire_events)
